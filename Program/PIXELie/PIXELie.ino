@@ -1,9 +1,9 @@
 /*
-  DIY Lighty + SD + OLED + 5 way joystick + WS2812B RGB LED
-  Dirk Essl 2020
+  DIY PIXELie + SD + OLED + 5 way joystick + WS2812B RGB LED
+  Konrad Grzeca 2021
   based on Digital Light Wand by Michael Ross
  
-  Lighty is for use in specialized Light Painting Photography
+  PIXELie is for use in specialized Light Painting Photography
   Applications.
  
   The functionality that is included in this code is as follows:
@@ -33,25 +33,14 @@
 #include <SPI.h>                         // Library for the SPI Interface
 #include <EEPROM.h>
 #include <Adafruit_SSD1306.h>
-//#include
+#include "defines.h"
  
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
- 
-#define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
-Adafruit_SSD1306 lcd(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
- 
-// Pin assignments for the Arduino (Make changes to these if you use different Pins)
-#define SDssPin 53                        // SD card CS pin
-int NPPin = 6;                            // Data Pin for the NeoPixel LED Strip
-int AuxButton = 4;                       // Aux Select Button Pin
-int AuxButtonGND = 5;                    // Aux Select Button Ground Pin
-int g = 0;                                // Variable for the Green Value
-int b = 0;                                // Variable for the Blue Value
-int r = 0;                                // Variable for the Red Value
- 
+int g = 0;                      // Variable for the Green Value
+int b = 0;                      // Variable for the Blue Value
+int r = 0;                      // Variable for the Red Value
+
 // Intial Variable declarations and assignments (Make changes to these if you want to change defaults)
-#define STRIP_LENGTH 144                  // Set the number of LEDs the LED Strip
+
 int frameDelay = 15;                      // default for the frame delay
 int menuItem = 1;                         // Variable for current main menu selection
 int initDelay = 0;                        // Variable for delay between button press and start of light sequence
@@ -65,17 +54,12 @@ int brightness = 50;                      // Variable and default for the Bright
 
 // the current address in the EEPROM (i.e. which byte we're going to write to next)
  
-// set addresses for save
-int addrframeDelay = 0;                       // default for the frame delay
-int addrinitDelay = 20;                        // Variable for delay between button press and start of light sequence
-int addrrepeat = 30;                           // Variable to select auto repeat (until select button is pressed again)
-int addrrepeatDelay = 400;                      // Variable for delay between repeats
-int addrupdateMode = 50;                       // Variable to keep track of update Modes
-int addrrepeatTimes = 60;                      // Variable to keep track of number of repeats
-int addrbrightness = 70;                       // Variable and default for the Brightness of the strip
+
  
 // Other program variable declarations, assignments, and initializations
 byte x;
+
+Adafruit_SSD1306 lcd(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
  
 // Declaring the two LED Strips and pin assignments to each
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(STRIP_LENGTH, NPPin, NEO_GRB + NEO_KHZ800);
@@ -94,47 +78,38 @@ long buffer[STRIP_LENGTH];
  
 // Setup 5 way joystick
  
-int uppin = 22;
-int downpin = 23;
-int leftpin = 24;
-int rightpin = 25;
-int entpin = 26;
+
  
 // Setup loop to get everything ready.  This is only run once at power on or reset
 void setup() {
  
-  pinMode(downpin, INPUT_PULLUP);
-  pinMode(leftpin, INPUT_PULLUP);
-  pinMode(rightpin, INPUT_PULLUP);
-  pinMode(entpin, INPUT_PULLUP);
-  pinMode(uppin, INPUT_PULLUP);
+  pinMode(DOWN_PIN, INPUT_PULLUP);
+  pinMode(LEFT_PIN, INPUT_PULLUP);
+  pinMode(RIGHT_PIN, INPUT_PULLUP);
+  pinMode(ENTER_PIN, INPUT_PULLUP);
+  pinMode(UP_PIN, INPUT_PULLUP);
  
   // check if values in eeprom make sense, otherwise set default value
-  if (EEPROM.read(addrbrightness) >= 1 && EEPROM.read(addrbrightness) <= 100) {
-    brightness = EEPROM.read(addrbrightness);
+  if (EEPROM.read(ADDR_BRIGHTNESS) >= 1 && EEPROM.read(ADDR_BRIGHTNESS) <= 100) {
+    brightness = EEPROM.read(ADDR_BRIGHTNESS);
   } else {
-    brightness = 50;
+    brightness = DEFAULT_BRIGHTNESS;
   }
+
+  if (EEPROM.read(ADDR_REPEATTIMES) >= 1 && EEPROM.read(ADDR_REPEATTIMES) <= 100) {
+    repeatTimes = EEPROM.read(ADDR_REPEATTIMES);
+  } else {
+    repeatTimes = 1;
+  }
+
+  if (EEPROM.read(ADDR_REPEATDELAY) >= 0 && EEPROM.read(ADDR_REPEATDELAY) <= 10000) {
+    repeatDelay = EEPROM.read(ADDR_REPEATDELAY);
+  } else {
+    repeatDelay = 0;
+  }
+
  
-  /*
-    if (EEPROM.read(addrrepeatTimes) >= 1 && EEPROM.read(addrrepeatTimes) <= 100) {
-      repeatTimes = EEPROM.read(addrrepeatTimes);
-    } else {
-      repeatTimes = 1;
-    }
- 
-    if (EEPROM.read(addrrepeatDelay) >= 0 && EEPROM.read(addrrepeatDelay) <= 10000) {
-      repeatDelay = EEPROM.read(addrrepeatDelay);
-    } else {
-      repeatDelay = 0;
-    }
-  */
- 
-  //Serial.begin(9600);
- 
-  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if (!lcd.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
-    //Serial.println(F("SSD1306 allocation failed"));
     for (;;); // Don't proceed, loop forever
   }
  
@@ -148,20 +123,20 @@ void setup() {
   lcd.setTextSize(2);
   lcd.setTextColor(SSD1306_WHITE);
   lcd.setCursor(0, 0);
-  lcd.println(F("PIXELie"));
+  lcd.println(F(PROGRAM_NAME));
   lcd.setTextSize(1);
   lcd.println(F("by Konrad Grzeca"));
-  lcd.println(F("V0.1"));
+  lcd.println(F(PROGRAM_VERSION));
   lcd.println(F(" "));
   lcd.println(F("..Initializing.."));
   lcd.println("Please wait");
   lcd.display();
   delay(1000);
  
-  pinMode(AuxButton, INPUT_PULLUP);
-  digitalWrite(AuxButton, INPUT_PULLUP);
-  pinMode(AuxButtonGND, INPUT_PULLUP);
-  digitalWrite(AuxButtonGND, INPUT_PULLUP);
+  pinMode(AUXBUTTON, INPUT_PULLUP);
+  digitalWrite(AUXBUTTON, INPUT_PULLUP);
+  pinMode(AUXBUTTONGND, INPUT_PULLUP);
+  digitalWrite(AUXBUTTONGND, INPUT_PULLUP);
  
   setupLEDs();
   setupSDcard();
@@ -178,7 +153,7 @@ void loop() {
       lcd.setTextSize(2);
       lcd.setTextColor(SSD1306_WHITE);
       lcd.setCursor(0, 0);
-      lcd.println(F("LIGHTY"));
+      lcd.println(F(PROGRAM_NAME));
       lcd.setTextSize(1);
       lcd.println(F("1:File Select "));
       lcd.println(m_CurrentFilename);
@@ -189,7 +164,7 @@ void loop() {
       lcd.setTextSize(2);
       lcd.setTextColor(SSD1306_WHITE);
       lcd.setCursor(0, 0);
-      lcd.println(F("LIGHTY"));
+      lcd.println(F(PROGRAM_NAME));
       lcd.setTextSize(1);
       lcd.println(F("2:Brightness "));
       lcd.println(brightness);
@@ -200,7 +175,7 @@ void loop() {
       lcd.setTextSize(2);
       lcd.setTextColor(SSD1306_WHITE);
       lcd.setCursor(0, 0);
-      lcd.println(F("LIGHTY"));
+      lcd.println(F(PROGRAM_NAME));
       lcd.setTextSize(1);
       lcd.println(F("3:Init Delay "));
       lcd.println(initDelay);
@@ -211,7 +186,7 @@ void loop() {
       lcd.setTextSize(2);
       lcd.setTextColor(SSD1306_WHITE);
       lcd.setCursor(0, 0);
-      lcd.println(F("LIGHTY"));
+      lcd.println(F(PROGRAM_NAME));
       lcd.setTextSize(1);
       lcd.println(F("4:Frame Delay"));
       lcd.println(frameDelay);
@@ -222,7 +197,7 @@ void loop() {
       lcd.setTextSize(2);
       lcd.setTextColor(SSD1306_WHITE);
       lcd.setCursor(0, 0);
-      lcd.println(F("LIGHTY"));
+      lcd.println(F(PROGRAM_NAME));
       lcd.setTextSize(1);
       lcd.println(F("5:Repeat Times"));
       lcd.println(repeatTimes);
@@ -233,7 +208,7 @@ void loop() {
       lcd.setTextSize(2);
       lcd.setTextColor(SSD1306_WHITE);
       lcd.setCursor(0, 0);
-      lcd.println(F("LIGHTY"));
+      lcd.println(F(PROGRAM_NAME));
       lcd.setTextSize(1);
       lcd.println(F("6:Repeat Delay"));
       lcd.println(repeatDelay);
@@ -244,13 +219,13 @@ void loop() {
   int keypress = ReadKeypad();
   delay(50);
  
-  if ((keypress == 4) || (digitalRead(AuxButton) == LOW)) {   // The select key was pressed
+  if ((keypress == 4) || (digitalRead(AUXBUTTON) == LOW)) {   // The select key was pressed
  
     lcd.clearDisplay();
     lcd.setTextSize(2);
     lcd.setTextColor(SSD1306_WHITE);
     lcd.setCursor(0, 0);
-    lcd.println(F(" "));
+    lcd.println(F(PROGRAM_NAME));
     lcd.setTextSize(1);
     lcd.println(F("Now Playing"));
     lcd.println(m_CurrentFilename);
@@ -317,32 +292,32 @@ void loop() {
         //BackLightOn();
         if (brightness > 1) {
           brightness -= 1;
-          EEPROM.put(addrbrightness, brightness);
+          EEPROM.put(ADDR_BRIGHTNESS, brightness);
  
         }
         break;
       case 3:                             // Adjust Initial Delay - 1 second
         if (initDelay > 0) {
           initDelay -= 1000;
-          EEPROM.put(addrinitDelay, initDelay);
+          EEPROM.put(ADDR_INITDELAY, initDelay);
         }
         break;
       case 4:                             // Adjust Frame Delay - 1 millisecond
         if (frameDelay > 0) {
           frameDelay -= 1;
-          EEPROM.put(addrframeDelay, frameDelay);
+          EEPROM.put(ADDR_FRAMEDELAY, frameDelay);
         }
         break;
       case 5:                             // Adjust Repeat Times - 1
         if (repeatTimes > 1) {
           repeatTimes -= 1;
-          EEPROM.put(addrrepeatTimes, repeatTimes);
+          EEPROM.put(ADDR_REPEATTIMES, repeatTimes);
         }
         break;
       case 6:                             // Adjust Repeat Delay - 100 milliseconds
         if (repeatDelay > 0) {
           repeatDelay -= 100;
-          EEPROM.put(addrrepeatDelay, repeatDelay);
+          EEPROM.put(ADDR_REPEATDELAY, repeatDelay);
         }
         break;
     }
@@ -350,7 +325,7 @@ void loop() {
  
 //if (digitalRead(uppin) == LOW) key = 1;
  
-  if (digitalRead(uppin) == LOW) {                 // The up key was pressed
+  if (digitalRead(UP_PIN) == LOW) {                 // The up key was pressed
     delay(50);
     if (menuItem == 1) {
       menuItem = 6;
@@ -401,23 +376,23 @@ void setupSDcard() {
  
 int ReadKeypad() {
   {
-    if (digitalRead(uppin) == LOW) key = 1;
+    if (digitalRead(UP_PIN) == LOW) key = 1;
     else key = -1;
   }
   {
-    if (digitalRead(downpin) == LOW) key = 2;
+    if (digitalRead(DOWN_PIN) == LOW) key = 2;
     else key = -1;
   }
   {
-    if (digitalRead(leftpin) == LOW) key = 3;
+    if (digitalRead(LEFT_PIN) == LOW) key = 3;
     //else key = oldkey;
   }
   {
-    if (digitalRead(rightpin) == LOW) key = 0;
+    if (digitalRead(RIGHT_PIN) == LOW) key = 0;
     //else key = oldkey;
   }
   {
-    if (digitalRead(entpin) == LOW) key = 4;
+    if (digitalRead(ENTER_PIN) == LOW) key = 4;
     //else key = oldkey;
   }
  
@@ -550,13 +525,6 @@ void getRGBwithGamma() {
 }
  
 void ReadTheFile() {
-#define MYBMP_BF_TYPE           0x4D42
-#define MYBMP_BF_OFF_BITS       54
-#define MYBMP_BI_SIZE           40
-#define MYBMP_BI_RGB            0L
-#define MYBMP_BI_RLE8           1L
-#define MYBMP_BI_RLE4           2L
-#define MYBMP_BI_BITFIELDS      3L
  
   uint16_t bmpType = readInt();
   uint32_t bmpSize = readLong();
